@@ -5,14 +5,19 @@ class Settings(BaseSettings):
     """
     Centralized configuration for the symbiotic system.
     """
+    # API Keys
     AGNO_API_KEY: str = os.getenv("AGNO_API_KEY", "")
     PERPLEXITY_API_KEY: str = os.getenv("PERPLEXITY_API_KEY", "")
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql+psycopg://user:pass@localhost:5432/lss_agents")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "") # Required for Embeddings in Knowledge
     
-    # Cognitive Core Settings
-    MODEL_NAME: str = "llama-3.1-sonar-large-128k-online"
-    PERPLEXITY_BASE_URL: str = "https://api.perplexity.ai"
-
+    # Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql+psycopg://ai:ai@localhost:5532/ai")
+    
+    # Model Configurations
+    PERPLEXITY_MODEL: str = "sonar-pro"
+    
     class Config:
         env_file = ".env"
 
