@@ -1,40 +1,64 @@
 from agno.agent import Agent
-from agno.models.openai import OpenAIChat
-from agno.storage.agent.postgres import PostgresAgentStorage
-# from agno.knowledge import AgentKnowledge # Placeholder for RAG - commented out as not fully implemented in snippet but required by import
+from agno.models.perplexity import Perplexity
+# from agno.models.groq import Groq  # Uncomment when needed
+# from agno.models.openrouter import OpenRouter # Uncomment when needed
+from agno.db.postgres import PostgresDb
+from agno.knowledge.knowledge import Knowledge
+from agno.knowledge.embedder.openai import OpenAIEmbedder
+from agno.vectordb.pgvector import PgVector
+
 from settings import settings
 from models.lss import LSSResponse
-from tools.perplexity import PerplexitySearchTool
 
-# --- Database Storage for Long-Term Memory ---
-# Note: Ensure the table exists or is created by the storage engine
-storage = PostgresAgentStorage(
-    table_name="agent_memory",
-    db_url=settings.DATABASE_URL
+# --- Database & Knowledge Setup ---
+# Using the specific DB URL structure from your snippet
+db_url = settings.DATABASE_URL
+knowledge_table = "lss_knowledge"
+
+# Initialize Knowledge Base (RAG)
+# Using OpenAIEmbedder as per your snippet (requires OPENAI_API_KEY)
+# If you strictly want to avoid OpenAI, you would need a different embedder, 
+# but I am following the provided code block which uses OpenAIEmbedder.
+knowledge = Knowledge(
+    vector_db=PgVector(
+        table_name=knowledge_table,
+        db_url=db_url,
+        embedder=OpenAIEmbedder(api_key=settings.OPENAI_API_KEY),
+    ),
 )
+
+# Placeholder: In a real scenario, you would add content here
+# knowledge.add_content(url="https://github.com/Lmao53and2/LeanSixSigma_Agents_Ops/blob/main/lss_methodology.pdf")
 
 # --- The Productivity Agent Definition ---
 productivity_agent = Agent(
     name="ProductivityAgent",
-    # Cognitive Core: Using Perplexity via OpenAI Interface
-    model=OpenAIChat(
-        id=settings.MODEL_NAME,
-        base_url=settings.PERPLEXITY_BASE_URL,
-        api_key=settings.PERPLEXITY_API_KEY,
+    
+    # Cognitive Core: Native Perplexity Model
+    # Leveraging the 'sonar-pro' model as requested
+    model=Perplexity(
+        id=settings.PERPLEXITY_MODEL, 
+        api_key=settings.PERPLEXITY_API_KEY
     ),
-    # Tooling: Real-time research capabilities
-    tools=[PerplexitySearchTool()],
-    # Memory: Persist interactions
-    storage=storage,
-    add_history_to_messages=True,
+    
+    # Memory: PostgresDb for user memories and session summaries
+    db=PostgresDb(db_url=db_url),
+    enable_user_memories=True,
+    enable_session_summaries=True,
+    
+    # Knowledge: RAG capabilities
+    knowledge=knowledge,
+    
     # Governance: Enforce DMAIC Structure
     response_model=LSSResponse,
+    markdown=True,
+    
     description="You are a Lean Six Sigma Master Black Belt AI. You do not just answer; you optimize.",
     instructions=[
         "Follow the DMAIC process for every request.",
         "DEFINE: Clarify the intent.",
         "MEASURE: Set success metrics.",
-        "ANALYZE: Use Perplexity tools to gather facts.",
+        "ANALYZE: Use your native search capabilities and knowledge base to gather facts.",
         "IMPROVE: Synthesize the answer.",
         "CONTROL: Rate your own confidence."
     ]
@@ -48,7 +72,12 @@ def run_agent_with_governance(query: str, max_retries: int = 2) -> LSSResponse:
     print(f"--- [Cognitive Core] Processing: {query} ---")
     
     # First Pass
-    response: LSSResponse = productivity_agent.run(query)
+    # Note: agno.agent.Agent.run() returns a RunOutput object. 
+    # With response_model set, the content should be the parsed model.
+    run_output = productivity_agent.run(query)
+    
+    # Extract the Pydantic model from the response
+    response: LSSResponse = run_output.content
     
     attempts = 0
     while response.control < 80 and attempts < max_retries:
@@ -61,7 +90,8 @@ def run_agent_with_governance(query: str, max_retries: int = 2) -> LSSResponse:
             f"CRITICAL INSTRUCTION: Re-analyze user requirements and IMPROVE accuracy to meet the Definition of Done."
         )
         
-        response = productivity_agent.run(improvement_prompt)
+        run_output = productivity_agent.run(improvement_prompt)
+        response = run_output.content
         attempts += 1
         
     return response
