@@ -7,4 +7,4 @@ httpx
 apscheduler
 psycopg
 pgvector
-openai
+fastembed
