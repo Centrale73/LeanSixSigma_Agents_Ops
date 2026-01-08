@@ -1,0 +1,10 @@
+agno
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+httpx
+apscheduler
+psycopg
+pgvector
+openai
