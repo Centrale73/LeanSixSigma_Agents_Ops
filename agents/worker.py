@@ -8,7 +8,7 @@ from agno.knowledge.embedder.fastembed import FastEmbedEmbedder
 from agno.vectordb.pgvector import PgVector
 
 from settings import settings
-from models.lss import LSSResponse
+from harness import DMAICHarness
 
 # --- Database & Knowledge Setup ---
 # Using the specific DB URL structure from your snippet
@@ -31,26 +31,25 @@ knowledge = Knowledge(
 # --- The Productivity Agent Definition ---
 productivity_agent = Agent(
     name="ProductivityAgent",
-    
+
     # Cognitive Core: Native Perplexity Model
     # Leveraging the 'sonar-pro' model as requested
     model=Perplexity(
-        id=settings.PERPLEXITY_MODEL, 
+        id=settings.PERPLEXITY_MODEL,
         api_key=settings.PERPLEXITY_API_KEY
     ),
-    
+
     # Memory: PostgresDb for user memories and session summaries
     db=PostgresDb(db_url=db_url),
     enable_user_memories=True,
     enable_session_summaries=True,
-    
+
     # Knowledge: RAG capabilities
     knowledge=knowledge,
-    
-    # Governance: Enforce DMAIC Structure
-    response_model=LSSResponse,
+
+    # Governance: Enforce DMAIC Structure (harness will manage response_model)
     markdown=True,
-    
+
     description="You are a Lean Six Sigma Master Black Belt AI. You do not just answer; you optimize.",
     instructions=[
         "Follow the DMAIC process for every request.",
@@ -62,34 +61,5 @@ productivity_agent = Agent(
     ]
 )
 
-def run_agent_with_governance(query: str, max_retries: int = 2) -> LSSResponse:
-    """
-    Implements the 'Self-Correction' Loop.
-    If Control Score < 80, the system recursively improves itself.
-    """
-    print(f"--- [Cognitive Core] Processing: {query} ---")
-    
-    # First Pass
-    # Note: agno.agent.Agent.run() returns a RunOutput object. 
-    # With response_model set, the content should be the parsed model.
-    run_output = productivity_agent.run(query)
-    
-    # Extract the Pydantic model from the response
-    response: LSSResponse = run_output.content
-    
-    attempts = 0
-    while response.control < 80 and attempts < max_retries:
-        print(f"--- [LSS Governance] Alert: Low Confidence ({response.control}%). Retrying (Attempt {attempts+1})... ---")
-        
-        # Feedback Loop: Feed the failure back into the context
-        improvement_prompt = (
-            f"Previous attempt scored {response.control}/100. "
-            f"Reasoning: {response.analyze}. "
-            f"CRITICAL INSTRUCTION: Re-analyze user requirements and IMPROVE accuracy to meet the Definition of Done."
-        )
-        
-        run_output = productivity_agent.run(improvement_prompt)
-        response = run_output.content
-        attempts += 1
-        
-    return response
+# --- DMAIC Governance Harness ---
+harness = DMAICHarness(agent=productivity_agent)
