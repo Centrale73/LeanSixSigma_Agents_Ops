@@ -104,9 +104,9 @@ class AgentRegistry:
         def decorator(fn: Callable) -> Callable:
             @wraps(fn)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                agent = fn(*args, **kwargs)
-                # Determine the effective parent: allow runtime override
+                # Extract _parent_id before calling fn so it doesn't leak
                 effective_parent = kwargs.pop("_parent_id", None) or parent_id
+                agent = fn(*args, **kwargs)
                 audit_id = self.register(agent, parent_id=effective_parent)
                 # Stash the audit_id on the agent for downstream use
                 agent._registry_audit_id = audit_id  # type: ignore[attr-defined]
